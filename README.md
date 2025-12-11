@@ -10,7 +10,7 @@ This project explores colorectal cancer risk factors through interactive data vi
 
 ## Live Demo
 
-**📊 View the Project:** [https://kshamaas.github.io/colorectal-cancer-analysis/](https://kshamaas.github.io/colorectal-cancer-analysis/)
+**View the Project:** [https://kshamaas.github.io/colorectal-cancer-analysis/](https://kshamaas.github.io/colorectal-cancer-analysis/)
 
 **Interactive Applications:**
 - [Parallel Coordinates Visualization](https://qpwgv0-kshamaa-suresh.shinyapps.io/parallel_coordinates_plot/)
