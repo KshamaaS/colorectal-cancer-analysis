@@ -2,6 +2,8 @@
 
 **Authors:** Rishika Mamidibathula (rm4318) and Kshamaa Suresh (ks4423)
 
+**Dataset** https://www.kaggle.com/datasets/ziya07/colorectal-cancer-dietary-and-lifestyle-dataset/data
+
 ## Project Overview
 
 This project explores colorectal cancer risk factors through interactive data visualization techniques. Using real patient data from over 1,000 participants (with maintained confidentiality), we analyze the complex relationships between demographic variables, lifestyle patterns, nutritional intake, and cancer risk. Our work demonstrates how interactive visualizations can transform complex multivariate health data into accessible and actionable insights.
