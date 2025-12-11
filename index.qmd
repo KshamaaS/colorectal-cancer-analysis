@@ -1,1 +1,31 @@
-# Introduction
+---
+title: "Exploratory Data Analysis for Colorectal Cancer"
+author: 
+  - "Project Team 11"
+  - "Rishika Mamidibathula (rm4318)"
+  - "Kshamaa Suresh (ks4423)"
+code-fold: true
+execute:
+  echo: true
+  warning: false
+  message: false
+format:
+  html:
+    embed-resources: true
+---
+
+Colorectal cancer remains one of the most prevalent and preventable cancers worldwide, with lifestyle and dietary factors playing significant roles in disease development. Traditional diagnostic and risk assessment methods have relied heavily on clinical parameters and statistical analyses. However, with the availability of comprehensive health data, a more visual and interactive approach can be developed to understand the complex interplay of risk factors.
+
+This project centers around a dataset containing health information from over one thousand real patients, with confidentiality carefully maintained throughout the analysis. Each participant is classified as either at risk or not at risk for colorectal cancer. The dataset includes measurements across eleven key variables: age, gender, body mass index, lifestyle patterns, family history of colorectal cancer, and detailed nutritional markers including carbohydrate, protein, and fat intake, as well as vitamin A, vitamin C, and iron levels. Our primary goal is to explore this dataset through interactive visualization techniques to understand which factors are most predictive of cancer risk and to determine whether these patterns can be effectively communicated through data-driven storytelling.
+
+We chose this topic because it presents a perfect opportunity to bridge the gap between data visualization techniques and real-world health data. Understanding the relationship between lifestyle factors, nutrition, and disease risk is an exciting and meaningful application of data science. It also provides an opportunity to apply sophisticated visualization techniques, such as parallel coordinates plots, interactive filtering, and dynamic variable selection, which are essential skills in modern data communication.
+
+Our research questions focus on understanding how multivariate health data can be visualized to draw meaningful insights. Specifically, we aim to explore several key questions. First, which demographic and lifestyle factors show the strongest associations with colorectal cancer risk, and how can we identify these patterns from the dataset? Second, how do nutritional intake patterns differ between at-risk and no-risk groups, and are there specific dietary combinations that appear protective or harmful? Third, can interactive visualizations reveal complex multivariate relationships that traditional statistical charts might miss? Fourth, how does family history amplify or modify the effects of other risk factors? Finally, what role do individual vitamins and minerals play in cancer risk when considered alongside broader lifestyle patterns? These questions guide our visualization design and analytical approach throughout the project.
+
+The project addresses several technical challenges inherent in working with high-dimensional health data. One such challenge is visual complexity, as displaying all one thousand participants across multiple variables simultaneously can create overwhelming clutter. We address this through adjustable opacity controls and strategic default variable selections. Additionally, the interactive nature requires balancing functionality with usability, ensuring that users can explore patterns without becoming lost in the complexity.
+
+Our methodology involves creating story-driven visualizations that transform raw data into actionable insights. The centerpiece is an interactive parallel coordinates plot that represents each participant as a line threading through multiple variable axes, with color encoding risk status. Users can dynamically select which variables to display, adjust line transparency, and filter specific value ranges by dragging on axes. This interactive capability transforms passive data consumption into active exploration, empowering viewers to discover patterns and relationships on their own.
+
+Throughout the project, we provide extensive interactivity to help interpret the results and communicate our findings effectively. Health data is complex and multi-dimensional, so clear, intuitive visualizations are essential to uncover meaningful patterns. Our approach emphasizes narrative-driven analysis over simple data display, ensuring that each visualization tells a specific story about colorectal cancer risk factors rather than merely presenting numbers.
+
+Our aim is not only to gain insights into the classification of cancer risk but also to showcase the power of modern interactive visualization techniques in the analysis of health data. This project allows us to apply data visualization principles while contributing to a better understanding of how visual analytics can be applied to solve problems in public health communication and risk awareness.

@@ -1,0 +1,659 @@
+---
+title: "Colorectal Cancer: Exploratory Data Analysis"
+execute:
+  echo: true
+format:
+  html:
+    fig-width: 6
+    fig-height: 4
+    embed-resources: true
+---
+
+# Setup and Data Loading
+```{r setup}
+#| warning: false
+#| code-fold: true
+
+# Load required libraries
+library(tidyverse)      # Data manipulation and visualization
+library(ggplot2)        # Advanced plotting
+library(gridExtra)      # Multiple plots
+library(corrplot)       # Correlation plots
+library(GGally)         # Pair plots
+library(knitr)          # Table formatting
+library(kableExtra)     # Enhanced tables
+library(scales)         # Scale functions
+library(viridis)        # Color palettes
+library(pROC)           # ROC curves
+
+# Custom theme for professional plots
+theme_story <- function() {
+  theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 16, hjust = 0),
+      plot.subtitle = element_text(size = 11, color = "gray30", margin = ggplot2::margin(b = 15)),
+      plot.caption = element_text(size = 9, hjust = 0, color = "gray40", 
+                                  margin = ggplot2::margin(t = 15), lineheight = 1.3),
+      legend.position = "right",
+      panel.grid.minor = element_blank(),
+      plot.margin = ggplot2::margin(20, 20, 20, 20)
+    )
+}
+
+# Set default theme
+theme_set(theme_story())
+
+# Color palette for risk levels
+risk_colors <- c("0" = "#27AE60", "1" = "#E74C3C")
+lifestyle_colors <- c("Active" = "#27AE60", "Moderate Exercise" = "#3498DB", 
+                      "Sedentary" = "#F39C12", "Smoker" = "#E74C3C")
+```
+```{r load-data}
+#| warning: false
+#| code-fold: true
+
+# Load the dataset ONCE
+df <- read_csv("data/crc_dataset.csv", show_col_types = FALSE)
+
+# Create a version with clean column names for plotting
+data <- df |>
+  rename(
+    Pre_existing_Conditions = `Pre-existing Conditions`,
+    Carbohydrates = `Carbohydrates (g)`,
+    Proteins = `Proteins (g)`,
+    Fats = `Fats (g)`,
+    Vitamin_A = `Vitamin A (IU)`,
+    Vitamin_C = `Vitamin C (mg)`,
+    Iron = `Iron (mg)`
+  )
+
+# Display basic information
+cat("Dataset loaded successfully!\n")
+cat(sprintf("Shape: %d rows × %d columns\n", nrow(df), ncol(df)))
+```
+
+# Data Overview
+
+## Dataset Structure
+```{r data-structure}
+#| warning: false
+#| code-fold: true
+
+library(DT)
+library(htmlwidgets)
+library(htmltools)
+
+# Convert CRC_Risk to labels for display
+data_display <- data %>%
+  mutate(CRC_Risk = ifelse(CRC_Risk == 0, "No Risk", "Positive Risk"))
+
+custom_colors <- c("#2ecc71", "#e74c3c", "#3498db", "#f39c12", "#9b59b6")
+
+# Complete compact CSS including pagination and controls
+compact_css <- "
+  /* Header cells */
+  .dataTables_wrapper .dataTable thead th {
+    font-size: 10px !important;
+    padding: 3px 5px !important;
+    line-height: 1.2 !important;
+  }
+  
+  /* Data cells */
+  .dataTables_wrapper .dataTable tbody td {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+    line-height: 1.2 !important;
+  }
+  
+  /* Filter text inputs */
+  .dataTables_wrapper thead input[type='search'],
+  .dataTables_wrapper thead input[type='text'] {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Filter dropdowns */
+  .dataTables_wrapper thead select {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+    height: 20px !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Filter row padding */
+  .dataTables_wrapper thead tr:last-child th {
+    padding: 2px 3px !important;
+  }
+  
+  /* Pagination and controls */
+  .dataTables_wrapper .dataTables_length,
+  .dataTables_wrapper .dataTables_filter,
+  .dataTables_wrapper .dataTables_info,
+  .dataTables_wrapper .dataTables_paginate {
+    font-size: 10px !important;
+  }
+  
+  /* Show entries dropdown */
+  .dataTables_wrapper .dataTables_length select {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+    height: 20px !important;
+  }
+  
+  /* Search box */
+  .dataTables_wrapper .dataTables_filter input {
+    font-size: 10px !important;
+    padding: 2px 4px !important;
+    height: 20px !important;
+  }
+  
+  /* Pagination buttons */
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+    margin: 0 1px !important;
+  }
+  
+  /* Info text (Showing 1 to 25...) */
+  .dataTables_wrapper .dataTables_info {
+    padding-top: 4px !important;
+    font-size: 10px !important;
+  }
+"
+
+interactive_table <- tagList(
+  tags$style(HTML(compact_css)),
+  datatable(
+    data_display,
+    colnames = c('Age', 'Gender', 'BMI', 'Lifestyle', 'Ethnicity', 
+                 'Family History', 'Pre-existing Conditions', 
+                 'Carbohydrates (g)', 'Proteins (g)', 'Fats (g)', 
+                 'Vitamin A (IU)', 'Vitamin C (mg)', 'Iron (mg)', 'CRC Risk'),
+    options = list(
+      pageLength = 25,
+      scrollX = TRUE,
+      scrollCollapse = TRUE,
+      fixedHeader = TRUE,
+      autoWidth = TRUE,
+      columnDefs = list(
+        list(visible = FALSE, targets = 0),  # Hide Participant_ID
+        list(searchable = FALSE, targets = 14)  # Disable filter for CRC Risk
+      )
+    ),
+    filter = "top",
+    caption = "Colorectal Cancer Dataset",
+    rownames = FALSE,
+    class = "cell-border stripe hover compact"
+  ) |>
+  formatRound(
+    columns = c("Age", "BMI", "Carbohydrates", "Proteins", 
+                "Fats", "Vitamin_A", "Vitamin_C", "Iron"),
+    digits = 2
+  ) |>
+  formatStyle("CRC_Risk",
+    backgroundColor = styleEqual(
+      c("No Risk", "Positive Risk"), 
+      c(custom_colors[1], custom_colors[2])
+    ),
+    color = "white", 
+    fontWeight = "bold", 
+    textAlign = "center"
+  ) |>
+  formatStyle("Family_History_CRC",
+    backgroundColor = styleEqual(c("No", "Yes"), c(custom_colors[1], custom_colors[2])),
+    color = "white", fontWeight = "bold", textAlign = "center"
+  ) |>
+  formatStyle("BMI",
+    backgroundColor = styleInterval(c(18.5, 25, 30),
+      c(custom_colors[4], custom_colors[1], custom_colors[4], custom_colors[2]))
+  ) |>
+  formatStyle("Carbohydrates",
+    backgroundColor = styleInterval(c(225, 325),
+      c(custom_colors[2], custom_colors[1], custom_colors[2])),
+    color = "white"
+  ) |>
+  formatStyle("Proteins",
+    backgroundColor = styleInterval(c(50, 100),
+      c(custom_colors[2], custom_colors[1], custom_colors[2])),
+    color = "white"
+  ) |>
+  formatStyle("Fats",
+    backgroundColor = styleInterval(c(44, 77),
+      c(custom_colors[2], custom_colors[1], custom_colors[2])),
+    color = "white"
+  ) |>
+  formatStyle("Vitamin_A",
+    backgroundColor = styleInterval(c(2000, 3000),
+      c(custom_colors[2], custom_colors[1], custom_colors[2])),
+    color = "white"
+  ) |>
+  formatStyle("Vitamin_C",
+    backgroundColor = styleInterval(c(75, 200),
+      c(custom_colors[2], custom_colors[1], custom_colors[2])),
+    color = "white"
+  ) |>
+  formatStyle("Iron",
+    backgroundColor = styleInterval(c(8, 18),
+      c(custom_colors[2], custom_colors[1], custom_colors[2])),
+    color = "white"
+  )
+)
+
+interactive_table
+```
+
+## Missing Values Analysis
+```{r missing-values}
+#| warning: false
+#| code-fold: true
+
+# Missing values summary
+missing_summary <- df |>
+  summarise(across(everything(), ~sum(is.na(.)))) |>
+  pivot_longer(everything(), names_to = "Column", values_to = "Missing_Count") |>
+  mutate(Percentage = round(Missing_Count / nrow(df) * 100, 2)) |>
+  filter(Missing_Count > 0) |>
+  arrange(desc(Missing_Count))
+
+if(nrow(missing_summary) > 0) {
+  kable(missing_summary, 
+        caption = "Missing Values Summary",
+        align = c('l', 'r', 'r')) |>
+    kable_styling(bootstrap_options = c("striped", "hover"))
+} else {
+  cat("No missing values detected!\n")
+}
+```
+
+## Target Variable Distribution
+```{r target-distribution}
+#| warning: false
+#| code-fold: true
+
+# CRC Risk distribution
+crc_summary <- df |>
+  count(CRC_Risk) |>
+  mutate(
+    Percentage = round(n / sum(n) * 100, 2),
+    Label = ifelse(CRC_Risk == 0, "No Risk", "At Risk")
+  )
+
+kable(crc_summary, 
+      caption = "CRC Risk Distribution",
+      col.names = c("CRC Risk", "Count", "Percentage (%)", "Label"),
+      align = c('c', 'r', 'r', 'l')) |>
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+cat(sprintf("\nCRC Risk Rate: %.2f%%\n", mean(df$CRC_Risk) * 100))
+```
+
+## Descriptive Statistics
+```{r numerical-stats}
+#| warning: false
+#| code-fold: true
+
+# Numerical variables statistics
+numerical_vars <- df |>
+  select(where(is.numeric), -Participant_ID, -CRC_Risk)
+
+summary_stats <- numerical_vars |>
+  pivot_longer(everything(), names_to = "Variable") |>
+  group_by(Variable) |>
+  summarise(
+    Mean = mean(value, na.rm = TRUE),
+    SD = sd(value, na.rm = TRUE),
+    Min = min(value, na.rm = TRUE),
+    Q1 = quantile(value, 0.25, na.rm = TRUE),
+    Median = median(value, na.rm = TRUE),
+    Q3 = quantile(value, 0.75, na.rm = TRUE),
+    Max = max(value, na.rm = TRUE)
+  )
+
+kable(summary_stats, 
+      digits = 2,
+      caption = "Descriptive Statistics - Numerical Variables") |>
+  kable_styling(bootstrap_options = c("striped", "hover")) |>
+  scroll_box(width = "100%")
+```
+```{r numerical-boxplots}
+#| warning: false
+#| code-fold: true
+
+numerical_vars |>
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") |>
+  ggplot(aes(x = Variable, y = Value)) +
+  geom_boxplot(fill = "skyblue", alpha = 0.7, outlier.color = "red", outlier.alpha = 0.5) +
+  facet_wrap(~Variable, scales = "free", ncol = 4) +
+  labs(title = "Distribution of Numerical Variables",
+       x = NULL, y = "Value") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major.x = element_blank())
+```
+
+## Overview Visualizations
+
+Distribution of Numeric Variables
+```{r numerical-summary}
+#| warning: false
+#| code-fold: true
+#| fig-height: 5
+
+numerical_vars |>
+  pivot_longer(everything()) |>
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "white") +
+  facet_wrap(~name, scales = "free") +
+  theme_minimal(base_size = 14)
+```
+
+Distribution of Categorical Variables
+```{r categorical-summary}
+#| warning: false
+#| code-fold: true
+#| fig-width: 10
+
+cat_vars <- c('Gender', 'Lifestyle', 'Ethnicity', 
+              'Family_History_CRC', 'Pre-existing Conditions')
+
+df |>
+  select(all_of(cat_vars)) |>
+  pivot_longer(everything()) |>
+  count(name, value) |>
+  ggplot(aes(x = value, y = n)) +
+  geom_col(fill = "coral") +
+  geom_text(aes(label = n), hjust = 1.2, size = 3.5, color = "white", fontface = "bold") +
+  facet_wrap(~name, scales = "free") +
+  coord_flip() +
+  labs(x = NULL, y = "Count") +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.major.y = element_blank())
+```
+
+## The Nutrition Divide  
+INSIGHT: Stark differences in nutritional patterns between risk groups.
+```{r}
+#| warning: false
+#| code-fold: true
+
+nutrition_profiles <- function(data) {
+  
+  # Prepare nutrition data
+  nutrition_long <- data %>%
+    mutate(Risk_Group = ifelse(CRC_Risk == 1, "CRC Risk", "No Risk")) %>%
+    select(Risk_Group, Carbohydrates, Proteins, Fats, 
+           Vitamin_A, Vitamin_C, Iron) %>%
+    pivot_longer(cols = -Risk_Group, 
+                names_to = "Nutrient", 
+                values_to = "Amount")
+  
+  # Calculate means and create categories
+  nutrition_summary <- nutrition_long %>%
+    group_by(Risk_Group, Nutrient) %>%
+    summarise(
+      Mean = mean(Amount, na.rm = TRUE),
+      SD = sd(Amount, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Category = case_when(
+        Nutrient %in% c("Vitamin_A", "Vitamin_C", "Iron") ~ "Micronutrients",
+        TRUE ~ "Macronutrients"
+      ),
+      Nutrient = str_replace(Nutrient, "_", " ")
+    )
+  
+  # Create the plot
+  p <- ggplot(nutrition_summary, aes(x = reorder(Nutrient, Mean), 
+                                      y = Mean, fill = Risk_Group)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.8), 
+             width = 0.7, alpha = 0.9) +
+    geom_errorbar(aes(ymin = Mean - SD/2, ymax = Mean + SD/2),
+                  position = position_dodge(width = 0.8), width = 0.25,
+                  alpha = 0.6) +
+    facet_wrap(~Category, scales = "free", ncol = 1) +
+    coord_flip() +
+    scale_fill_manual(values = c("No Risk" = "#27AE60", "CRC Risk" = "#E74C3C")) +
+    labs(
+      title = "What Separates Risk Groups",
+      subtitle = "CRC risk group shows distinct nutritional deficiencies in protective micronutrients",
+      x = "",
+      y = "Average Daily Intake",
+      fill = "Risk Status",
+      caption = str_wrap("KEY INSIGHT: Individuals at risk show significantly lower intake of Vitamin C and Iron - both known to have protective effects. Macronutrient differences suggest poor overall diet quality. This points to specific, actionable dietary interventions.", 100)
+    )
+  
+  return(p)
+}
+
+plot1 <- nutrition_profiles(data)
+print(plot1)
+```
+
+This visualization compares nutritional intake patterns between individuals with and without colorectal cancer risk. The graph is divided into two panels showing macronutrients and micronutrients, with green bars representing the no-risk group and red bars showing the at-risk group. While macronutrient differences are relatively modest across carbohydrates, proteins, and fats, the micronutrient panel reveals striking disparities. The at-risk group shows substantially lower intake of Vitamin C and Iron, both known for their protective effects against cancer. Vitamin A also shows noticeable differences. These patterns suggest that targeted dietary interventions focusing on increasing protective micronutrients through fruits, vegetables, and fortified foods could significantly reduce cancer risk.
+
+## The BMI-Lifestyle Heatmap  
+INSIGHT: Combined effect of body weight and activity level
+```{r}
+#| warning: false
+#| code-fold: true
+#| fig-height: 6
+
+bmi_lifestyle_interaction <- function(data) {
+  
+  # Create BMI categories
+  data_plot <- data %>%
+    mutate(
+      BMI_Category = cut(BMI, 
+                        breaks = c(17, 18.5, 25, 30, 36),
+                        labels = c("Underweight", "Normal", "Overweight", "Obese")),
+      Risk_Status = factor(CRC_Risk, levels = c(0, 1))
+    )
+  
+  # Calculate risk percentages
+  heatmap_data <- data_plot %>%
+    filter(!is.na(BMI_Category)) %>%
+    group_by(BMI_Category, Lifestyle) %>%
+    summarise(
+      risk_rate = mean(CRC_Risk == 1) * 100,
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    filter(n >= 5)
+  
+  # Create heatmap
+  p <- ggplot(heatmap_data, aes(x = Lifestyle, y = BMI_Category, fill = risk_rate)) +
+    geom_tile(color = "white", size = 1.5) +
+    geom_text(aes(label = sprintf("%.1f%%\n(n=%d)", risk_rate, n)), 
+              color = "white", fontface = "bold", size = 3.5) +
+    scale_fill_gradient2(low = "#27AE60", mid = "#F39C12", high = "#E74C3C",
+                        midpoint = 30, name = "Risk Rate (%)") +
+    labs(
+      title = "Risk hotspots created by BMI and Lifestyle",
+      subtitle = "Obesity + Sedentary lifestyle shows highest risk; Active lifestyle protects even at higher BMI",
+      x = "Lifestyle Pattern",
+      y = "BMI Category",
+      caption = str_wrap("KEY INSIGHT: The deadliest combination is Obesity + Smoking/Sedentary lifestyle. However, active individuals show lower risk even at higher BMI levels, suggesting that physical activity can partially offset weight-related risk. Prevention should target the top-right quadrant.", 100)
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid = element_blank()
+    )
+  
+  return(p)
+}
+
+plot2 <- bmi_lifestyle_interaction(data)
+print(plot2)
+```
+
+This heatmap reveals how body mass index and lifestyle choices interact to create cancer risk hotspots. Each cell shows the risk rate for a specific BMI-lifestyle combination, with colors ranging from green (low risk) to red (high risk). The deadliest combination appears in the top-right corner where obese smokers show fifty-three percent risk, while obese sedentary individuals reach thirty-six percent. However, the encouraging finding is that active individuals maintain low risk even in the overweight and obese categories, demonstrating that physical activity provides substantial protection regardless of body weight. This suggests that becoming more active may be the most impactful single intervention for cancer prevention.
+
+## The Family History Insights  
+INSIGHT: How genetics and lifestyle interact
+```{r}
+#| warning: false
+#| code-fold: true
+#| fig-height: 6
+
+family_history_factor <- function(data) {
+  
+  # Calculate risk by lifestyle and family history
+  family_data <- data %>%
+    group_by(Lifestyle, Family_History_CRC) %>%
+    summarise(
+      risk_rate = mean(CRC_Risk == 1) * 100,
+      n = n(),
+      .groups = "drop"
+    )
+  
+  # Create grouped bar plot
+  p <- ggplot(family_data, aes(x = reorder(Lifestyle, risk_rate), 
+                                y = risk_rate, 
+                                fill = Family_History_CRC)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.8), 
+             width = 0.7) +
+    geom_text(aes(label = sprintf("%.1f%%", risk_rate)),
+              position = position_dodge(width = 0.8),
+              vjust = -0.5, size = 3.5, fontface = "bold") +
+    scale_fill_manual(values = c("No" = "#3498DB", "Yes" = "#E74C3C"),
+                     name = "Family History\nof CRC") +
+    labs(
+      title = "Family History Magnifies Lifestyle Risk",
+      subtitle = "Those with family history show 1.5-2x higher risk across all lifestyle types",
+      x = "Lifestyle Pattern",
+      y = "CRC Risk Rate (%)",
+      caption = str_wrap("KEY INSIGHT: Family history consistently doubles the baseline risk, but lifestyle still matters enormously. Even with genetic predisposition, active individuals have lower risk than sedentary people without family history. Genetics loads the gun, but lifestyle pulls the trigger.", 100)
+    ) +
+    coord_cartesian(ylim = c(0, max(family_data$risk_rate) * 1.15))
+  
+  return(p)
+}
+
+plot3 <- family_history_factor(data)
+print(plot3)
+```
+
+This grouped bar chart demonstrates how family history of colorectal cancer amplifies risk across all lifestyle patterns. The blue bars represent individuals without family history, while red bars show those with family history. Family history consistently doubles baseline risk, with the red bars standing taller across every lifestyle category. However, the crucial insight emerges when comparing specific groups: active individuals with family history show only twenty percent risk, significantly lower than the thirty percent risk seen in smokers without family history. This reveals that while genetics create vulnerability, lifestyle choices ultimately determine outcomes. The metaphor holds true: genetics loads the gun, but lifestyle pulls the trigger.
+
+## The Vitamin Influence  
+INSIGHT: Protective effects of micronutrients
+```{r}
+#| warning: false
+#| code-fold: true
+#| fig-height: 7
+
+vitamin_protection <- function(data) {
+  
+  # Prepare data for PCA - select nutritional variables and remove missing values
+  pca_data <- data %>%
+    select(Carbohydrates, Proteins, Fats, Vitamin_A, Vitamin_C, Iron, CRC_Risk) %>%
+    na.omit()
+  
+  # Perform PCA on nutritional variables
+  pca_result <- prcomp(pca_data[, 1:6], scale. = TRUE, center. = TRUE)
+  
+  # Extract PC scores and add risk status
+  pca_scores <- as.data.frame(pca_result$x[, 1:2])
+  pca_scores$CRC_Risk <- factor(pca_data$CRC_Risk, 
+                                levels = c(0, 1),
+                                labels = c("No Risk", "CRC Risk"))
+  
+  # Extract variable loadings for arrows
+  pca_loadings <- as.data.frame(pca_result$rotation[, 1:2])
+  pca_loadings$Variable <- rownames(pca_loadings)
+  
+  # Calculate variance explained
+  var_explained <- summary(pca_result)$importance[2, 1:2] * 100
+  
+  # Create PCA biplot
+  p <- ggplot(pca_scores, aes(x = PC1, y = PC2, color = CRC_Risk)) +
+    geom_point(alpha = 0.6, size = 2.5) +
+    stat_ellipse(aes(fill = CRC_Risk), geom = "polygon", 
+                 alpha = 0.1, level = 0.68, show.legend = FALSE) +
+    # Add loading arrows
+    geom_segment(data = pca_loadings,
+                 aes(x = 0, y = 0, xend = PC1 * 4, yend = PC2 * 4),
+                 arrow = arrow(length = unit(0.3, "cm")),
+                 color = "black", size = 0.8, alpha = 0.7,
+                 inherit.aes = FALSE) +
+    geom_text(data = pca_loadings,
+              aes(x = PC1 * 4.5, y = PC2 * 4.5, label = Variable),
+              color = "black", fontface = "bold", size = 3.5,
+              inherit.aes = FALSE) +
+    scale_color_manual(values = c("No Risk" = "#27AE60", "CRC Risk" = "#E74C3C")) +
+    scale_fill_manual(values = c("No Risk" = "#27AE60", "CRC Risk" = "#E74C3C")) +
+    labs(
+      title = "Nutritional Profiles Separate Risk Groups",
+      subtitle = sprintf("Micronutrient patterns distinguish cancer risk groups (PC1: %.1f%%, PC2: %.1f%%)",
+                        var_explained[1], var_explained[2]),
+      x = sprintf("Principal Component 1 (%.1f%% variance)", var_explained[1]),
+      y = sprintf("Principal Component 2 (%.1f%% variance)", var_explained[2]),
+      color = "Risk Status",
+      caption = str_wrap("KEY INSIGHT: The PCA biplot shows clear separation between risk groups along nutritional dimensions. Vitamin C, Vitamin A, and Iron point away from the high-risk cluster (red), indicating these micronutrients are protective. Individuals with higher levels of these nutrients (upper-right quadrant) show lower cancer risk. Simple dietary changes focusing on fruits, vegetables, and fortified foods could significantly reduce population risk.", 100)
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      plot.subtitle = element_text(size = 11),
+      legend.position = "top",
+      plot.margin = ggplot2::margin(10, 10, 10, 10)
+    )
+  
+  return(p)
+}
+
+plot4 <- vitamin_protection(data)
+print(plot4)
+```
+
+This principal component analysis biplot reveals how nutritional patterns distinguish individuals by cancer risk status. Each dot represents a participant, colored by risk status (green for no risk, red for CRC risk), while arrows indicate the direction and strength of each nutrient's contribution. The two principal components together explain thirty-six percent of variation in nutritional profiles. Critically, Vitamin C, Vitamin A, and Iron arrows point away from the concentrated red cluster, indicating that individuals with higher intake of these protective micronutrients occupy different nutritional space than those at risk. The clear separation suggests that targeted dietary interventions emphasizing these micronutrients could effectively reduce cancer risk.
+
+## The Gender Difference  
+INSIGHT: How risk patterns differ between men and women
+```{r}
+#| warning: false
+#| code-fold: true
+
+gender_analysis <- function(data) {
+  
+  # Calculate risk by gender and lifestyle
+  gender_data <- data %>%
+    mutate(Age_Group = cut(Age, breaks = c(24, 40, 55, 81),
+                          labels = c("25-40", "41-55", "56-80"))) %>%
+    group_by(Gender, Age_Group, Lifestyle) %>%
+    summarise(
+      risk_rate = mean(CRC_Risk == 1) * 100,
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    filter(n >= 5)
+  
+  # Create faceted plot
+  p <- ggplot(gender_data, aes(x = Age_Group, y = risk_rate, 
+                                group = Lifestyle, color = Lifestyle)) +
+    geom_line(size = 1.2) +
+    geom_point(size = 3) +
+    facet_wrap(~Gender) +
+    scale_color_manual(values = lifestyle_colors) +
+    labs(
+      title = "Different Risk Trajectories for Men and Women",
+      subtitle = "Men show earlier risk escalation; women's risk accelerates later",
+      x = "Age Group",
+      y = "CRC Risk Rate (%)",
+      color = "Lifestyle",
+      caption = str_wrap("KEY INSIGHT: Men generally show higher baseline risk and earlier onset, particularly in the 41-55 age group. Women's risk increases more dramatically after 55, possibly linked to hormonal changes. This suggests gender-specific screening recommendations may be warranted.", 100)
+    )
+  
+  return(p)
+}
+
+plot6 <- gender_analysis(data)
+print(plot6)
+```
+
+This faceted line plot reveals distinct gender differences in colorectal cancer risk trajectories across age groups. Men generally display higher baseline risk and earlier onset, with notable escalation in the forty-one to fifty-five age range, particularly among smokers who reach thirty-five percent risk. Women maintain relatively lower risk in younger and middle age groups, but experience dramatic acceleration after age fifty-five, with female smokers jumping from thirty-one percent to forty-seven percent risk in the oldest age bracket. This pattern suggests possible hormonal influences, as women's risk surge coincides with typical menopausal timing. These gender-specific trajectories indicate that screening protocols may benefit from tailored approaches.

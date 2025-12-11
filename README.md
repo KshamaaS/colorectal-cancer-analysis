@@ -1,64 +1,79 @@
-This repo contains a [Quarto book](https://quarto.org/docs/books/) template for the EDAV final project.
+# Colorectal Cancer Risk Analysis
 
-## Follow these instructions carefully
+**Authors:** Rishika Mamidibathula (rm4318) and Kshamaa Suresh (ks4423)
 
-*If you have any difficulties or have feedback of any kind, please [file an issue](https://github.com/jtr13/quarto-edav-template/issues) or ask questions in the [Discussions](https://github.com/jtr13/quarto-edav-template/discussions) section.*
+## Project Overview
 
-[Video tutorial](https://www.youtube.com/watch?v=emgS2JI4jCk) (walkthrough of steps below)
+This project explores colorectal cancer risk factors through interactive data visualization techniques. Using real patient data from over 1,000 participants (with maintained confidentiality), we analyze the complex relationships between demographic variables, lifestyle patterns, nutritional intake, and cancer risk. Our work demonstrates how interactive visualizations can transform complex multivariate health data into accessible and actionable insights.
 
-### Copy this template (GitHub)
+## Live Demo
 
-- [ ] 1. Click the green "Use this template" button above and choose "Create a new repository". If you don't see the "Use this template" option, **log in to GitHub**. DO NOT FORK THE REPO. Choose a descriptive name for your repo, such as "federalbudget" or "AIDSdeaths". (If you change your topic before you do any work, delete the repo and start over.)
+**📊 View the Project:** [https://kshamaas.github.io/colorectal-cancer-analysis/](https://kshamaas.github.io/colorectal-cancer-analysis/)
 
-- [ ] 2. Leave the setting for viewing the repo as "Public". (Otherwise, we will not be able to access your rendered book.)
+**Interactive Applications:**
+- [Parallel Coordinates Visualization](https://qpwgv0-kshamaa-suresh.shinyapps.io/parallel_coordinates_plot/)
+- [Risk Prediction Calculator](https://qpwgv0-kshamaa-suresh.shinyapps.io/risk_prediction/)
 
-- [ ] 3. In the Description field, write "Source files for final project" then click "Create repository".
+## Key Features
 
-### Set up Pages (GitHub)
+### Interactive Parallel Coordinates Plot
+An interactive visualization allowing dynamic exploration of relationships between multiple risk factors simultaneously. Users can select variable combinations, adjust opacity, and filter specific value ranges to discover patterns across demographic, lifestyle, and nutritional factors.
 
-- [ ] 1. You've now left the template page and are viewing your new repo on GitHub. On the home page, click Settings. Click the "Pages" section on the left. In the Build and Deployment section, set Source to "Deploy from a branch" (Classic Pages experience) and Branch to main with /docs folder. Click Save.
+### Risk Prediction Calculator
+A personalized risk assessment tool powered by logistic regression that predicts colorectal cancer risk based on individual health profiles. Features include:
+- Real-time risk calculation with visual gauge
+- What-if scenario simulator for exploring lifestyle modifications
+- Risk contribution breakdown showing which factors drive predictions
+- Comparison to healthy ranges and low-risk profiles
+- Risk trajectory tracking across multiple predictions
 
-- [ ] 2. Click the little gear button near "About" on the top right side of the home page of the repo and check the "Use your Github Pages website" box under "Website". Click "Save changes". Test the link and you should see a web site with a stick figure on it. It may take a few minutes to build so if it's not working do a few more steps and then come back to check.
+### Static Visualizations
+Comprehensive exploratory data analysis including distributions, correlations, and categorical variable relationships that provide foundational insights into the dataset.
 
-### Copy the repo link (GitHub)
+## Dataset
 
-- [ ] 1. Click the green Code button, choose "HTTPS" and copy the link below. It should have the format: https&#xfeff;://github.com/[USERNAME]/[REPONAME].git
+The analysis uses a dataset of 1,000+ real patient records with the following variables:
+- **Demographic:** Age, Gender, Ethnicity
+- **Health Metrics:** BMI, Family History of CRC, Pre-existing Conditions
+- **Lifestyle:** Activity patterns (Active, Moderate Exercise, Sedentary, Smoker)
+- **Nutritional Intake:** Carbohydrates, Proteins, Fats, Vitamin A, Vitamin C, Iron
+- **Outcome:** CRC Risk (Binary: At Risk / No Risk)
 
-### Clone the repo (RStudio)
+## Technologies Used
 
-- [ ] 1. Clone your new repo with *File, New Project..., Version Control, Git* in RStudio. You will need to paste the link from the previous step in the Repository URL box. If it's not automatically populated, enter the repo name in the "Project directory name:" box. Choose the location of the project.
+- **R & RStudio** - Data analysis and visualization
+- **Quarto** - Documentation and website generation
+- **Shiny** - Interactive web applications
+- **Plotly** - Interactive visualizations
+- **ggplot2** - Static visualizations
+- **GitHub Pages** - Static website hosting
+- **shinyapps.io** - Shiny application hosting
 
-### Edit `_quarto.yml` (RStudio)
+## Key Findings
 
-Tip: From the file pane in RStudio, open `README.md`, which contains these instructions. You can delete steps as you complete them.
+- Lifestyle patterns, particularly smoking combined with sedentary behavior, show strong associations with elevated cancer risk
+- Family history acts as a risk amplifier that modifies the effects of other factors
+- At-risk individuals tend toward higher carbohydrate and fat intake with lower vitamin C levels
+- Interactive visualizations reveal multivariate patterns that would require dozens of static charts to capture
 
-- [ ] 1. Change the all caps info in the `title:`, `author:` and `repo-url` fields in the YAML (top) section of `_quarto.yml` to your info. (Note: it's very important to maintain the indenting structure in this file precisely as is -- be careful!)
+## Reproducibility
 
-### Render the book (RStudio)
+This project follows reproducible research principles:
+1. All analysis code is embedded in Quarto documents
+2. Data processing and visualization steps are documented
+3. Interactive applications can be run locally or accessed via cloud deployment
+4. Version control through Git/GitHub ensures transparency
 
-- [ ] 1. If you haven't already, click "Help" "Check for Updates" to make sure you have the latest version of RStudio (and thus have Quarto installed.)
+## License
 
-- [ ] 2. Render the web site locally by clicking the "Build" tap on the right and then "Render Book".
+This project is created for educational purposes as part of coursework at Columbia University.
 
-- [ ] 3. Use `browseURL("docs/index.html")` to view your book locally (or just open `docs/index.html` in a browser).
+## Contact
 
-- [ ] 4. If it looks good, commit and push all changed files to GitHub.
-      
-- [ ] 5. Check that the rendered site looks correct on GitHub and that the links back to GitHub (icon on top left, edit this page / report an issue on right) work properly. Note that there is a delay between the time you push the files and when they show up on your sitel You can check the progress by clicking the Actions tab.
+For questions or collaboration:
+- Kshamaa Suresh: ks4423@columbia.edu
+- Rishika Mamidibathula: rm4318@columbia.edu
 
-(You will need to repeat steps 2 and 4 every time you wish to update the book on GitHub Pages.)
+---
 
-### Update README (GitHub or RStudio)
-
-- [ ] 1. Delete the content of this **README** and add a short description of your project in its place. If you're working locally, be sure to commit and push the changes to GitHub.
-
-### Optional
-
-- [ ] 1. Choose a theme from [https://bootswatch.com/](https://bootswatch.com/) and replace "cosmo" in `_quarto.yml` with your prefered theme.
-
-### Additional features
-
-Please consult the official guide to **quarto** book websites: [https://quarto.org/docs/books/](https://quarto.org/docs/books/)
-
-
-
+*Source files for final project. Data confidentiality maintained throughout analysis.*

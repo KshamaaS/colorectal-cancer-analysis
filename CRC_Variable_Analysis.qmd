@@ -1,0 +1,407 @@
+---
+title: "Colorectal Cancer: Variable Analysis"
+code-fold: true
+execute:
+  echo: true
+  warning: false
+  message: false
+format:
+  html:
+    embed-resources: true
+---
+
+## Interactive Plots
+
+```{r}
+#Load the libraries
+library(plotly)
+library(tidyverse)
+library(htmlwidgets)
+library(GGally)
+```
+
+Load the data from the csv file
+
+```{r}
+data <- read.csv("data/crc_dataset.csv")
+
+# Rename columns to match
+data <- data |> rename(
+  Pre_existing_Conditions = Pre.existing.Conditions,
+  Carbohydrates = Carbohydrates..g.,
+  Proteins = Proteins..g.,
+  Fats = Fats..g.,
+  Vitamin_A = Vitamin.A..IU.,
+  Vitamin_C = Vitamin.C..mg.,
+  Iron = Iron..mg.
+)
+```
+
+## Comprehensive Multi-Dimensional Exploration.
+
+This plot allows users to select which variables to display on X and Y axes, with color, size, and filtering options for all other variables. This single plot can show any combination of relationships in our dataset.
+
+```{r}
+create_selectable_3d_explorer <- function(data) {
+  
+  # Prepare data
+  plot_data <- data %>%
+    mutate(
+      Risk_Status = factor(CRC_Risk, levels = c(0, 1), 
+                           labels = c("No Risk", "CRC Risk"))
+    )
+  
+  # Create base plot with Vitamin C as default Z axis
+  p <- plot_ly(
+    data = plot_data,
+    x = ~Age,
+    y = ~BMI,
+    z = ~Vitamin_C,
+    type = "scatter3d",
+    mode = "markers",
+    color = ~Risk_Status,
+    colors = c("No Risk" = "#27AE60", "CRC Risk" = "#E74C3C"),
+    size = ~Iron,
+    sizes = c(5, 15),
+    marker = list(
+      opacity = 0.6,
+      line = list(color = "white", width = 0.5)
+    ),
+    text = ~paste(
+      "<b>Participant", Participant_ID, "</b><br>",
+      "Age:", Age, "| Gender:", Gender, "<br>",
+      "BMI:", round(BMI, 1), "| Lifestyle:", Lifestyle, "<br>",
+      "Family History:", Family_History_CRC, "<br>",
+      "Carbs:", round(Carbohydrates, 1), "g | Proteins:", round(Proteins, 1), "g<br>",
+      "Fats:", round(Fats, 1), "g<br>",
+      "Vitamin A:", round(Vitamin_A, 0), "IU | Vitamin C:", round(Vitamin_C, 1), "mg<br>",
+      "Iron:", round(Iron, 1), "mg<br>",
+      "<b>Status:", Risk_Status, "</b>"
+    ),
+    hoverinfo = "text"
+  ) %>%
+    layout(
+      scene = list(
+        xaxis = list(title = "Age (years)"),
+        yaxis = list(title = "BMI"),
+        zaxis = list(title = "Vitamin C (mg)")
+      ),
+      margin = list(t = 100, b = 60, l = 60, r = 60),
+      
+      # Add dropdown menu to select Z-axis variable
+      updatemenus = list(
+        list(
+          type = "dropdown",
+          active = 0,
+          x = 0.5,
+          xanchor = "center",
+          y = 1.12,
+          yanchor = "top",
+          bgcolor = "#f0f0f0",
+          bordercolor = "#666",
+          borderwidth = 2,
+          buttons = list(
+            list(
+              label = "Z-axis: Vitamin C (mg)",
+              method = "update",
+              args = list(
+                list(z = list(plot_data$Vitamin_C)),
+                list(scene = list(zaxis = list(title = "Vitamin C (mg)")))
+              )
+            ),
+            list(
+              label = "Z-axis: Iron (mg)",
+              method = "update",
+              args = list(
+                list(z = list(plot_data$Iron)),
+                list(scene = list(zaxis = list(title = "Iron (mg)")))
+              )
+            ),
+            list(
+              label = "Z-axis: Vitamin A (IU)",
+              method = "update",
+              args = list(
+                list(z = list(plot_data$Vitamin_A)),
+                list(scene = list(zaxis = list(title = "Vitamin A (IU)")))
+              )
+            ),
+            list(
+              label = "Z-axis: Carbohydrates (g)",
+              method = "update",
+              args = list(
+                list(z = list(plot_data$Carbohydrates)),
+                list(scene = list(zaxis = list(title = "Carbohydrates (g)")))
+              )
+            ),
+            list(
+              label = "Z-axis: Proteins (g)",
+              method = "update",
+              args = list(
+                list(z = list(plot_data$Proteins)),
+                list(scene = list(zaxis = list(title = "Proteins (g)")))
+              )
+            ),
+            list(
+              label = "Z-axis: Fats (g)",
+              method = "update",
+              args = list(
+                list(z = list(plot_data$Fats)),
+                list(scene = list(zaxis = list(title = "Fats (g)")))
+              )
+            )
+          )
+        )
+      ),
+      
+      annotations = list(
+        list(
+          text = "Select Z-axis variable:  ",
+          x = 0.35,
+          y = 1.12,
+          xref = "paper",
+          yref = "paper",
+          xanchor = "right",
+          showarrow = FALSE,
+          font = list(size = 13)
+        )
+      )
+    )
+  
+  return(p)
+}
+```
+
+```{r}
+explorer_plot <- create_selectable_3d_explorer(data)
+explorer_plot
+```
+
+This three-dimensional interactive visualization explores the relationship between age, body mass index, and Vitamin C intake in determining colorectal cancer risk. Each point represents an individual participant, colored by risk status (green for no risk, red for CRC risk), with point size indicating iron intake levels. Users can click and drag to rotate the three-dimensional space, revealing clusters and patterns from multiple angles. Hovering over any point displays complete participant information including all demographic factors, lifestyle characteristics, and nutritional variables. This spatial representation helps identify how these three critical factors interact to create risk profiles across the population.
+
+## Interactive Risk Heatmap.
+
+```{r}
+create_clean_risk_heatmap <- function(data) {
+  
+  # Create meaningful categories
+  heatmap_data <- data %>%
+    mutate(
+      Age_Group = cut(Age, breaks = c(0, 40, 55, 70, 100),
+                     labels = c("25-40", "41-55", "56-70", "71-80")),
+      BMI_Cat = cut(BMI, breaks = c(0, 25, 30, 100),
+                   labels = c("Normal", "Overweight", "Obese")),
+      Combined = paste(Age_Group, BMI_Cat, sep = " | ")
+    ) %>%
+    group_by(Combined, Lifestyle) %>%
+    summarise(
+      risk_rate = mean(CRC_Risk == 1) * 100,
+      count = n(),
+      avg_vitc = mean(Vitamin_C),
+      avg_iron = mean(Iron),
+      .groups = "drop"
+    ) %>%
+    filter(count >= 5) %>%
+    mutate(
+      hover_text = paste0(
+        "<b>Risk: ", round(risk_rate, 1), "%</b><br>",
+        "Group: ", Combined, "<br>",
+        "Lifestyle: ", Lifestyle, "<br>",
+        "Sample: ", count, " people<br>",
+        "Avg Vit C: ", round(avg_vitc, 1), " mg<br>",
+        "Avg Iron: ", round(avg_iron, 1), " mg"
+      )
+    )
+  
+  plot_ly(
+    heatmap_data,
+    x = ~Lifestyle,
+    y = ~Combined,
+    z = ~risk_rate,
+    type = "heatmap",
+    colors = colorRamp(c("#27AE60", "#F39C12", "#E74C3C")),
+    text = ~hover_text,
+    hoverinfo = "text",
+    colorbar = list(title = "Risk %", len = 0.7)
+  ) %>%
+    layout(
+      title = "CRC Risk Heatmap: Age-BMI Groups × Lifestyle<br><sub>Hover for details including vitamin levels</sub>",
+      xaxis = list(title = "Lifestyle Type", tickangle = -45),
+      yaxis = list(title = "Age Group | BMI Category"),
+      margin = list(l = 150, t = 100, r = 100, b = 100)
+    )
+}
+```
+
+```{r}
+risk_heatmap <- create_clean_risk_heatmap(data)
+risk_heatmap
+```
+
+This interactive heatmap displays colorectal cancer risk rates across combinations of age groups, BMI categories, and lifestyle patterns. Each cell represents a specific demographic-lifestyle combination, with color intensity indicating risk percentage ranging from green (low risk) to red (high risk). The vertical axis shows twelve age-BMI combinations while the horizontal axis displays four lifestyle types. Users can hover over any cell to view exact risk rates, sample sizes, and average vitamin intake levels for that group. This categorical visualization reveals clear risk hotspots where multiple factors compound, particularly among older, obese individuals with sedentary or smoking lifestyles, while demonstrating protective effects of active living.
+
+## Aggregated Parallel Coordinates plot
+
+```{r}
+create_aggregated_parallel_coordinates <- function(data) {
+  
+  # Prepare data
+  parallel_data <- data %>%
+    mutate(
+      Risk_Status = ifelse(CRC_Risk == 1, "CRC Risk", "No Risk"),
+      Lifestyle_Numeric = case_when(
+        Lifestyle == "Active" ~ 1,
+        Lifestyle == "Moderate Exercise" ~ 2,
+        Lifestyle == "Sedentary" ~ 3,
+        Lifestyle == "Smoker" ~ 4
+      )
+    )
+  
+  # Calculate summary statistics for each risk group
+  vars_to_plot <- c("Age", "BMI", "Vitamin_C", "Iron", "Proteins", "Carbohydrates")
+  
+  # Normalize variables to 0-100 scale for comparison
+  normalized_data <- parallel_data %>%
+    mutate(across(all_of(vars_to_plot), 
+                  ~scales::rescale(.x, to = c(0, 100)),
+                  .names = "{.col}_norm"))
+  
+  # Calculate quartiles for each group
+  summary_stats <- normalized_data %>%
+    group_by(Risk_Status) %>%
+    summarise(
+      across(ends_with("_norm"), 
+             list(q25 = ~quantile(.x, 0.25),
+                  median = ~quantile(.x, 0.5),
+                  q75 = ~quantile(.x, 0.75)),
+             .names = "{.col}_{.fn}")
+    )
+  
+  # Create plot
+  fig <- plot_ly()
+  
+  # Add quartile bands for No Risk group (green)
+  no_risk_stats <- summary_stats %>% filter(Risk_Status == "No Risk")
+  
+  for(i in 1:(length(vars_to_plot)-1)) {
+    var_current <- paste0(vars_to_plot[i], "_norm")
+    var_next <- paste0(vars_to_plot[i+1], "_norm")
+    
+    fig <- fig %>%
+      add_trace(
+        x = c(i, i+1, i+1, i),
+        y = c(no_risk_stats[[paste0(var_current, "_q75")]], 
+              no_risk_stats[[paste0(var_next, "_q75")]],
+              no_risk_stats[[paste0(var_next, "_q25")]],
+              no_risk_stats[[paste0(var_current, "_q25")]]),
+        type = "scatter",
+        mode = "lines",
+        fill = "toself",
+        fillcolor = "rgba(39, 174, 96, 0.2)",
+        line = list(color = "transparent"),
+        showlegend = (i == 1),
+        name = "No Risk Range",
+        legendgroup = "no_risk",
+        hoverinfo = "skip"
+      )
+  }
+  
+  # Add median line for No Risk
+  median_x <- 1:length(vars_to_plot)
+  median_y_no_risk <- sapply(vars_to_plot, function(v) {
+    no_risk_stats[[paste0(v, "_norm_median")]]
+  })
+  
+  fig <- fig %>%
+    add_trace(
+      x = median_x,
+      y = median_y_no_risk,
+      type = "scatter",
+      mode = "lines+markers",
+      line = list(color = "#27AE60", width = 3),
+      marker = list(size = 8),
+      name = "No Risk Median",
+      legendgroup = "no_risk",
+      hovertemplate = "%{y:.1f}<extra></extra>"
+    )
+  
+  # Add quartile bands for CRC Risk group (red)
+  risk_stats <- summary_stats %>% filter(Risk_Status == "CRC Risk")
+  
+  for(i in 1:(length(vars_to_plot)-1)) {
+    var_current <- paste0(vars_to_plot[i], "_norm")
+    var_next <- paste0(vars_to_plot[i+1], "_norm")
+    
+    fig <- fig %>%
+      add_trace(
+        x = c(i, i+1, i+1, i),
+        y = c(risk_stats[[paste0(var_current, "_q75")]], 
+              risk_stats[[paste0(var_next, "_q75")]],
+              risk_stats[[paste0(var_next, "_q25")]],
+              risk_stats[[paste0(var_current, "_q25")]]),
+        type = "scatter",
+        mode = "lines",
+        fill = "toself",
+        fillcolor = "rgba(231, 76, 60, 0.2)",
+        line = list(color = "transparent"),
+        showlegend = (i == 1),
+        name = "CRC Risk Range",
+        legendgroup = "crc_risk",
+        hoverinfo = "skip"
+      )
+  }
+  
+  # Add median line for CRC Risk
+  median_y_risk <- sapply(vars_to_plot, function(v) {
+    risk_stats[[paste0(v, "_norm_median")]]
+  })
+  
+  fig <- fig %>%
+    add_trace(
+      x = median_x,
+      y = median_y_risk,
+      type = "scatter",
+      mode = "lines+markers",
+      line = list(color = "#E74C3C", width = 3),
+      marker = list(size = 8),
+      name = "CRC Risk Median",
+      legendgroup = "crc_risk",
+      hovertemplate = "%{y:.1f}<extra></extra>"
+    )
+  
+  # Layout
+  fig <- fig %>%
+    layout(
+      title = "Aggregated Parallel Coordinates: Risk Group Patterns<br><sub>Bands show 25th-75th percentile range | Lines show median values | All data used for calculation</sub>",
+      xaxis = list(
+        tickmode = "array",
+        tickvals = 1:length(vars_to_plot),
+        ticktext = vars_to_plot,
+        title = ""
+      ),
+      yaxis = list(
+        title = "Normalized Value (0-100 scale)",
+        range = c(-5, 105)
+      ),
+      hovermode = "closest",
+      legend = list(
+        orientation = "v",
+        x = 1.02,
+        y = 1,
+        xanchor = "left",
+        yanchor = "top",
+        bgcolor = "rgba(255, 255, 255, 0.9)",
+        bordercolor = "#666",
+        borderwidth = 1,
+        font = list(size = 11),
+        tracegroupgap = 15
+      ),
+      margin = list(t = 100, b = 80, l = 80, r = 150)
+    )
+  
+  return(fig)
+}
+aggregated_parallel <- create_aggregated_parallel_coordinates(data)
+aggregated_parallel
+```
+
+This aggregated parallel coordinates visualization displays median nutritional and demographic profiles for two risk groups across six variables, with all values normalized to a zero to one hundred scale for comparison. The shaded bands represent the middle fifty percent of data (twenty-fifth to seventy-fifth percentile), while solid lines trace median values. The CRC risk group, shown in red, exhibits notably higher age and BMI values alongside lower Vitamin C intake compared to the no-risk group in green. This aggregation approach uses all one thousand participants to calculate statistics, providing clear group-level patterns without the visual clutter of individual data points, making differences between risk profiles immediately apparent.

@@ -1,0 +1,334 @@
+---
+title: "Colorectal Cancer: Categorical Variable Analysis"
+execute:
+  echo: true
+format:
+  html:
+    fig-width: 6
+    fig-height: 4
+    embed-resources: true
+---
+
+# Setup and Data Loading
+
+```{r setup}
+#| warning: false
+#| code-fold: true
+
+# Load required libraries
+library(tidyverse)      # Data manipulation and visualization
+library(ggplot2)        # Advanced plotting
+library(gridExtra)      # Multiple plots
+library(corrplot)       # Correlation plots
+library(GGally)         # Pair plots
+library(knitr)          # Table formatting
+library(kableExtra)     # Enhanced tables
+library(scales)         # Scale functions
+library(viridis)        # Color palettes
+library(pROC)           # ROC curves
+library(randomForest)   # Random forest
+
+# Set theme for all plots
+theme_set(theme_minimal(base_size = 12))
+```
+
+```{r load-data}
+#| warning: false
+#| code-fold: true
+# Load the dataset
+df <- read_csv("data/crc_dataset.csv", show_col_types = FALSE)
+
+```
+
+```{r define-cat-vars}
+#| warning: false
+#| code-fold: true
+cat_vars <- c(
+  "Gender",
+  "Lifestyle",
+  "Ethnicity",
+  "Family_History_CRC",
+  "Pre-existing Conditions"
+)
+```
+
+# Part 1: Lifestyle Factors Analysis
+
+```{r lifestyle-factors-analysis}
+#| warning: false
+#| code-fold: true 
+
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(viridis)
+library(ggalluvial)  # For alluvial diagrams
+library(ggmosaic)    # For mosaic plots
+
+```
+
+# Alluvial Diagram
+
+```{r fig-alluvial, fig.width=14, fig.height=8}
+#| fig-cap: "Alluvial Flow Diagram: Categorical Variables to CRC Risk"
+#| warning: false
+#| code-fold: true
+
+# Prepare data for alluvial plot
+alluvial_data <- df |>
+  mutate(CRC_Risk_Label = ifelse(CRC_Risk == 0, "No Risk", "At Risk")) |>
+  count(Gender, Lifestyle, Family_History_CRC, CRC_Risk_Label) |>
+  filter(n > 5)  # Filter small groups for clarity
+
+ggplot(alluvial_data,
+       aes(axis1 = Gender, axis2 = Lifestyle, 
+           axis3 = Family_History_CRC, axis4 = CRC_Risk_Label,
+           y = n)) +
+  geom_alluvium(aes(fill = CRC_Risk_Label), alpha = 0.7) +
+  geom_stratum(alpha = 0.5) +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum)), size = 3) +
+  scale_fill_manual(values = c("No Risk" = "#2ecc71", "At Risk" = "#e74c3c")) +
+  scale_x_discrete(limits = c("Gender", "Lifestyle", "Family History", "CRC Risk"),
+                   expand = c(0.15, 0.05)) +
+  labs(title = "Flow of Categorical Variables to CRC Risk",
+       subtitle = "Width of flows represents number of individuals",
+       y = "Count", fill = "CRC Risk") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        legend.position = "bottom",
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank())
+```
+
+The alluvial diagram shows how individuals flow from gender to lifestyle to family history and ultimately to CRC risk. The most visible pattern is the strong movement of smokers into the At Risk group, matching the higher CRC risk seen later. Active and moderately active groups show predominantly green flows into No Risk, reflecting their lower-risk profiles. Similarly, individuals with Family History = Yes show a clear red path toward At Risk, whereas those with no family history mostly end up in No Risk. Gender flows look nearly balanced, indicating minimal impact relative to lifestyle and hereditary factors.
+
+# Grouped Risk Comparison
+
+```{r fig-grouped-comparison, fig.width=12, fig.height=10}
+#| fig-cap: "Ranked CRC Risk Rates Across All Categories"
+#| warning: false
+#| code-fold: true
+
+# Prepare data for grouped comparison
+comparison_data <- df |>
+  select(all_of(cat_vars), CRC_Risk) |>
+  pivot_longer(cols = all_of(cat_vars), 
+               names_to = "Variable", 
+               values_to = "Category") |>
+  group_by(Variable, Category) |>
+  summarise(
+    Risk_Rate = mean(CRC_Risk) * 100,
+    n = n(),
+    .groups = "drop"
+  ) |>
+  mutate(Label = paste0(Variable, ": ", Category)) |>
+  arrange(desc(Risk_Rate))
+
+ggplot(comparison_data, aes(x = reorder(Label, Risk_Rate), 
+                            y = Risk_Rate, fill = Variable)) +
+  geom_col(color = "black", linewidth = 0.3) +
+  geom_text(aes(label = sprintf("%.1f%% (n=%d)", Risk_Rate, n)), 
+            hjust = -0.1, size = 3) +
+  coord_flip() +
+  scale_fill_viridis_d(option = "D") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(title = "CRC Risk Rates Ranked Across All Categorical Variables",
+       subtitle = "Which categories have highest risk?",
+       x = NULL, y = "CRC Risk Rate (%)",
+       fill = "Variable") +
+  theme_minimal(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        legend.position = "bottom",
+        panel.grid.major.y = element_blank())
+```
+The ranked bar plot quantifies CRC risk across categories. Smokers have the highest risk at 37.8%, far above any other group. Family history follows at 23.5%, while hypertension shows 19.5%. Ethnicity categories range from 11.8% (Asian) to 19.2% (Hispanic). Gender differences remain small, with female at 16.5% and male at 14.6%. Meanwhile, healthy lifestyle behaviors show much lower risk: Active (10.4%), Moderate Exercise (8%), and Sedentary (5.8%). This reinforces the dominance of lifestyle and family history as risk factors.
+
+# Odds Ratio Forest Plot
+
+```{r fig-forest-plot, fig.width=12, fig.height=10}
+#| fig-cap: "Odds Ratios for CRC Risk by Category"
+#| warning: false
+#| code-fold: true
+
+# Calculate odds ratios with confidence intervals
+calculate_or <- function(var_name) {
+  df |>
+    select(all_of(var_name), CRC_Risk) |>
+    rename(Variable = 1) |>
+    group_by(Variable) |>
+    summarise(
+      cases = sum(CRC_Risk == 1),
+      controls = sum(CRC_Risk == 0),
+      total = n(),
+      .groups = "drop"
+    ) |>
+    mutate(
+      odds = cases / controls,
+      VarName = var_name
+    )
+}
+
+# Get baseline odds (overall rate)
+baseline_odds <- sum(df$CRC_Risk == 1) / sum(df$CRC_Risk == 0)
+
+# Calculate for all variables
+or_data <- map_dfr(cat_vars, calculate_or) |>
+  mutate(
+    or = odds / baseline_odds,
+    log_or = log(or),
+    # Approximate 95% CI (simplified)
+    se = sqrt(1/cases + 1/controls),
+    ci_lower = exp(log_or - 1.96 * se),
+    ci_upper = exp(log_or + 1.96 * se),
+    Label = paste0(VarName, ": ", Variable),
+    Significance = case_when(
+      ci_lower > 1 ~ "Increased Risk",
+      ci_upper < 1 ~ "Decreased Risk",
+      TRUE ~ "No Significant Effect"
+    )
+  )
+
+ggplot(or_data, aes(x = or, y = reorder(Label, or))) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray40", linewidth = 1) +
+  geom_errorbarh(aes(xmin = ci_lower, xmax = ci_upper, color = Significance),
+                 height = 0.3, linewidth = 1) +
+  geom_point(aes(color = Significance), size = 4) +
+  scale_color_manual(values = c("Increased Risk" = "#e74c3c",
+                                "Decreased Risk" = "#2ecc71",
+                                "No Significant Effect" = "#95a5a6")) +
+  scale_x_log10(breaks = c(0.25, 0.5, 1, 2, 4, 8)) +
+  labs(title = "Forest Plot: Odds Ratios for CRC Risk",
+       subtitle = "Reference line at OR = 1 (no effect). Bars show 95% confidence intervals.",
+       x = "Odds Ratio (log scale)", y = NULL,
+       color = "Effect") +
+  theme_minimal(base_size = 12) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        legend.position = "bottom",
+        panel.grid.major.y = element_blank())
+```
+The forest plot highlights the magnitude of each factor’s effect on CRC risk. Smokers show the highest odds ratio (OR > 3), meaning their odds of CRC are more than triple the reference level. Individuals with Family History = Yes also exhibit substantially elevated odds (OR > 2). In contrast, protective behaviors appear on the left side of the plot: Active, Moderate Exercise, and Sedentary groups all show reduced odds (OR < 1), with sedentary individuals having one of the lowest OR values in the plot. Most other categories, including ethnicity and gender, lie close to OR = 1, indicating no strong effect.
+
+# Stacked Percentage Bars
+
+```{r fig-stacked-all, fig.width=12, fig.height=10}
+#| fig-cap: "Comprehensive Stacked View: All Categories and CRC Risk"
+#| warning: false
+#| code-fold: true
+
+# Prepare comprehensive stacked data
+stacked_data <- df |>
+  select(all_of(cat_vars), CRC_Risk) |>
+  pivot_longer(cols = all_of(cat_vars), 
+               names_to = "Variable", 
+               values_to = "Category") |>
+  mutate(Full_Label = paste0(Variable, "\n", Category)) |>
+  count(Full_Label, Variable, CRC_Risk) |>
+  group_by(Full_Label) |>
+  mutate(
+    Total = sum(n),
+    Percentage = n / Total * 100,
+    CRC_Risk_Label = ifelse(CRC_Risk == 0, "No Risk", "At Risk")
+  ) |>
+  ungroup() |>
+  arrange(Variable, Full_Label)
+
+ggplot(stacked_data, aes(x = reorder(Full_Label, -Total), 
+                         y = n, fill = CRC_Risk_Label)) +
+  geom_col(position = "fill", color = "black", linewidth = 0.2) +
+  geom_text(aes(label = sprintf("%.0f%%", Percentage)), 
+            position = position_fill(vjust = 0.5), 
+            size = 3, fontface = "bold", color = "white") +
+  scale_fill_manual(values = c("No Risk" = "#2ecc71", "At Risk" = "#e74c3c")) +
+  scale_y_continuous(labels = percent) +
+  coord_flip() +
+  labs(title = "CRC Risk Distribution Across All Categorical Variables",
+       subtitle = "Proportional view of risk within each category",
+       x = NULL, y = "Proportion",
+       fill = "CRC Risk") +
+  theme_minimal(base_size = 11) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+        legend.position = "bottom",
+        panel.grid.major.y = element_blank())
+```
+The stacked bar chart visualizes the proportion of at-risk individuals within each category. Smokers again stand out, with 38% of the group classified at risk. Those with Family History = Yes have 23% at risk, and individuals with Hypertension show 20% at risk. Groups with lower risk include Active (10%), Moderate Exercise (8%), Sedentary (6%), and Family History = No (7%). These proportional differences match the risk rates and odds ratios, emphasizing how lifestyle and genetic components strongly shape CRC outcomes.
+
+# Mosaic Plot
+
+```{r fig-mosaic-pairs-crc}
+#| fig-width: 30
+#| fig-height: 30
+#| fig-cap: "Mosaic Pairs: CRC Dataset (all factor variables)"
+#| warning: false
+#| code-fold: true
+
+library(dplyr)
+library(vcd)
+
+# Use your CRC data frame (df) in the same way SleepStudy used SS
+crc_factors <- df |>
+  # Make CRC_Risk a factor with labels
+  mutate(
+    CRC_Risk = factor(ifelse(CRC_Risk == 0, "No Risk", "At Risk"))
+  ) |>
+  # Turn all character columns into factors
+  mutate(across(where(is.character), as.factor))
+
+# Keep only factor variables you want in the mosaic pairs
+cats <- crc_factors |>
+  select(where(is.factor))
+
+# Build an n-way contingency table of all factor variables
+tab_all <- xtabs(~ ., data = cats)
+
+# Mosaic pairs: pairwise mosaics in off-diagonals, names on diagonal
+pairs(
+  tab_all,
+  shade    = TRUE,                    # red/blue residual shading
+  gp       = vcd::shading_Friendly,   # Friendly red/blue palette
+  labeling = vcd::labeling_values,
+  main     = "Mosaic Pairs: CRC Dataset (all factor variables)"
+)
+
+# Pairwise associations using Cramér's V 
+pairV <- combn(names(cats), 2, simplify = FALSE, FUN = function(v) {
+  tb <- table(cats[[v[1]]], cats[[v[2]]])
+  V  <- suppressWarnings(vcd::assocstats(tb)$cramer)
+  p  <- suppressWarnings(chisq.test(tb)$p.value)
+  data.frame(var1 = v[1], var2 = v[2], cramerV = V, p_value = p)
+}) |>
+  bind_rows() |>
+  arrange(desc(cramerV), p_value)
+
+```
+The mosaic plot shows the strength of association between categorical variables and CRC risk. The strongest shading appears for Lifestyle × CRC_Risk, which aligns with its highest Cramér’s V value (0.360) and extremely low p-value. Family History × CRC_Risk also shows noticeable shading, reflecting meaningful dependence. In contrast, Gender × CRC_Risk displays the weakest association, supported by its lowest Cramér’s V (0.026) and non-significant p-value. The mosaic plot visually confirms the patterns seen in the other analyses: lifestyle and family history drive the most meaningful associations.
+
+# Chi-Square Test Results
+
+```{r categorical-summary-stats}
+#| warning: false
+#| code-fold: true
+
+# Perform chi-square tests
+chisq_results <- map_dfr(cat_vars, function(var) {
+  test_table <- table(df[[var]], df$CRC_Risk)
+  chisq_test <- chisq.test(test_table)
+  
+  tibble(
+    Variable = var,
+    ChiSquare = chisq_test$statistic,
+    P_Value = chisq_test$p.value,
+    Significant = ifelse(chisq_test$p.value < 0.05, "Yes", "No")
+  )
+})
+
+kable(chisq_results, 
+      digits = 4,
+      caption = "Statistical Significance Tests") |>
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+The chi-square results formally show that Lifestyle and Family History are the only categorical variables significantly associated with CRC risk (p < 0.001 for both). Gender (p = 0.4567), Ethnicity (p = 0.1390), and Pre-existing Conditions (p = 0.1090) do not meet significance thresholds. This statistical pattern aligns directly with the forest plot, ranked bar plot, and stacked percentages.
+
+**Conclusion:** Across all analyses, Lifestyle (particularly smoking) and Family History of CRC consistently emerge as the strongest contributors to CRC risk. Smokers show the highest CRC rate (37.8%) and significantly elevated odds (OR > 3). Individuals with a family history of CRC show a high rate (23.5%) and increased odds (OR > 2). These findings are supported by proportional comparisons, risk rankings, and mosaic associations. In contrast, gender, ethnicity, and most pre-existing conditions show weak or nonsignificant effects. The dataset therefore suggests that behavioral and hereditary factors are the primary determinants of CRC risk.

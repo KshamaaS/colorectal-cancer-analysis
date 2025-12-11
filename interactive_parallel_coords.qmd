@@ -1,0 +1,18 @@
+---
+title: "Interactive Parallel Coordinates Plot"
+format: 
+  html:
+    page-layout: full
+    margin-left: 0px
+    margin-right: 0px
+---
+
+This interactive parallel coordinates visualization displays all one thousand participants as lines threading through multiple variable axes, with color indicating cancer risk status (green for no risk, red for CRC risk). Users can dynamically select which variables to display by clicking the toggle buttons above the plot, with four to six variables recommended for optimal clarity. The opacity slider controls line transparency, allowing users to reduce visual clutter by making lines more transparent to reveal aggregate patterns. The key interactive feature involves dragging vertically on any axis to filter specific value ranges, instantly highlighting only participants matching those criteria. This filtering capability transforms the dense visualization into a powerful exploratory tool for identifying multivariate patterns.
+
+<div style="text-align: center; margin: 40px 0;">
+  <a href="https://qpwgv0-kshamaa-suresh.shinyapps.io/parallel_coordinates_plot/" target="_blank" style="display: inline-block; padding: 15px 40px; background-color: #27AE60; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold;">
+    Launch Interactive Visualization
+  </a>
+</div>
+
+<iframe src="https://qpwgv0-kshamaa-suresh.shinyapps.io/parallel_coordinates_plot/" width="100%" height="1200px" style="border: 1px solid #ddd; border-radius: 4px; margin-top: 20px;"></iframe>

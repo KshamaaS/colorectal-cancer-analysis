@@ -1,0 +1,127 @@
+---
+title: "Colorectal Cancer: Numerical Variable Analysis"
+execute:
+  echo: true
+format:
+  html:
+    fig-width: 6
+    fig-height: 4
+    embed-resources: true
+---
+
+# Setup and Data Loading
+
+```{r load-libraries}
+#| warning: false
+#| code-fold: true
+# Load libraries
+library(tidyverse)
+library(GGally)
+library(corrplot)
+library(viridis)
+```
+
+
+```{r load-data}
+#| warning: false
+#| code-fold: true
+crc <- read_csv("data/crc_dataset.csv", show_col_types = FALSE)
+
+# Make sure CRC_Risk is a factor (for coloring)
+crc <- crc |>
+  mutate(CRC_Risk = as.factor(CRC_Risk))
+
+```
+
+```{r num-vars}
+#| warning: false
+#| code-fold: true
+num_vars <- crc |>
+  select(
+    Age, BMI,
+    `Carbohydrates (g)`, `Proteins (g)`, `Fats (g)`,
+    `Vitamin A (IU)`, `Vitamin C (mg)`, `Iron (mg)`
+  )
+```
+
+# Interactive Scatterplot: Age vs BMI by CRC Risk
+
+```{r interactive-scatter-plot, fig.width=12, fig.height=10}
+#| warning: false
+#| code-fold: true
+# Interactive scatterplot with plotly
+library(plotly)
+library(dplyr)
+
+scatter_data <- crc |>
+  select(Age, BMI, CRC_Risk)
+
+plot_ly(
+  data = scatter_data,
+  x = ~Age,
+  y = ~BMI,
+  color = ~CRC_Risk,
+  type = "scatter",
+  mode = "markers",
+  marker = list(size = 8, opacity = 0.7)
+) |>
+  layout(
+    title = "Interactive Scatterplot: Age vs BMI by CRC Risk",
+    xaxis = list(title = "Age (years)"),
+    yaxis = list(title = "BMI"),
+    legend = list(title = list(text = "CRC Risk"))
+  )
+
+```
+
+Across the age spectrum, BMI remains highly variable, and the two risk groups appear largely intermixed. However, there is a subtle trend indicating that individuals who fall into the higher age and higher BMI ranges are slightly more likely to belong to the CRC Risk 1 category. While this pattern is not strong enough to create a clear visual boundary between the groups, it does suggest that a combination of older age and elevated BMI may contribute modestly to increased colorectal cancer risk. Overall, the scatterplot indicates that Age and BMI alone are not strong discriminators but may play a small associative role when considered together.
+
+# Scatterplot Matrix
+
+```{r scatter-plot-matrix, fig.width=12, fig.height=10}
+#| warning: false
+#| code-fold: true
+# Scatterplot matrix (GGally)
+library(GGally)
+
+# Combine numeric vars + CRC_Risk for coloring
+spm_data <- crc |>
+  select(
+    Age, BMI,
+    `Carbohydrates (g)`, `Proteins (g)`, `Fats (g)`,
+    CRC_Risk
+  )
+
+GGally::ggpairs(
+  data = spm_data,
+  columns = 1:5,    # numeric columns
+  aes(color = CRC_Risk, alpha = 0.7),
+  progress = FALSE
+)
+
+```
+The scatterplot matrix further reinforces this observation. Pairwise relationships between the numerical variables reveal extremely weak linear correlations, with coefficients close to zero for almost all combinations. The density plots along the diagonal demonstrate that the distributions of Age, BMI, macronutrients, and micronutrients are broadly similar for both CRC risk categories. The scatter panels appear as diffuse clouds without any directional structure, indicating an absence of meaningful bivariate patterns. Together, these results imply that single-variable or pairwise relationships are not sufficient to distinguish between low- and high-risk individuals.
+
+# PCA Biplot
+
+```{r pca, fig.width=12, fig.height=10}
+#| warning: false
+#| code-fold: true
+
+library(factoextra)
+
+pca_res <- prcomp(num_vars, scale. = TRUE, center = TRUE)
+
+fviz_pca_biplot(
+  pca_res,
+  geom.ind  = "point",
+  col.ind   = crc$CRC_Risk,   # color points by CRC_Risk
+  palette   = "Dark2",
+  addEllipses = TRUE,
+  label     = "var",          # show only variable labels
+  repel     = TRUE
+) +
+  labs(title = "PCA Biplot of Nutritional and Demographic Variables")
+
+```
+The PCA biplot supports this conclusion by showing that the first two principal components capture only a modest proportion of the variance in the dataset, with nutrients and BMI primarily driving the variation rather than CRC risk status. Individuals from both risk groups cluster tightly together in the central region of the PCA space, and the ellipses surrounding each group overlap almost entirely. Although certain variables such as Vitamin A, Vitamin C, and BMI contribute visibly to the principal components, these contributions do not translate into meaningful separation between risk categories.

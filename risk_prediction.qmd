@@ -1,0 +1,38 @@
+---
+title: "CRC Risk Prediction Calculator"
+format: 
+  html:
+    page-layout: full
+    margin-left: 0px
+    margin-right: 0px
+---
+
+This interactive risk prediction tool uses a logistic regression model trained on patient data to estimate colorectal cancer risk based on your personal health profile. The calculator considers multiple factors including demographic information, lifestyle patterns, nutritional intake, and medical history to provide a comprehensive risk assessment.
+
+1.⁠ ⁠Risk Gauge (Indicator Plot)
+A plotly indicator visualization displaying predicted CRC risk probability with three-zone color mapping (0-30%: green, 30-70%: yellow, 70-100%: red) and delta reference to 50% classification threshold. Provides immediate risk level identification.
+
+2.⁠ ⁠Distance from Healthy Ranges (Bar Chart)
+Quantitative assessment of feature deviations from evidence-based healthy ranges (USDA 2020-2025, NIH RDAs). Calculated as ((user_value - healthy_threshold) / healthy_threshold) × 100. Threshold-based color coding (±20%) prioritizes interventions.
+
+3.⁠ ⁠Risk Prediction Simulator (Interactive Widget)
+Real-time prediction recalculation engine using logistic regression model. Accepts single-feature modifications and outputs: baseline risk, simulated risk, absolute change (Δ%), relative change (Δ%/baseline), and impact classification. Enables counterfactual analysis.
+
+4.⁠ ⁠Risk Contribution Breakdown (Pie Chart)
+Additive risk decomposition using formula: Contribution_i = |((x_i - μ_i) × β_i)| / Σ|contributions|. Visualizes relative importance of each feature in individual risk profile, normalized to percentages for interpretability.
+
+5.⁠ ⁠Risk Trajectory (Time Series Plot)
+Temporal visualization of predicted risk across t prediction sessions with dynamic y-axis scaling: range = [max(0, min(risk) - 10), min(100, max(risk) + 10)]. Trend classification (improving/increasing/stable) based on first-to-last comparison with color-coded title.
+
+6.⁠ ⁠Low-Risk Profile Comparison (Grouped Bar Chart)
+Normalized (z-scored) comparison of user features against empirical low-risk population medians (n=845, 84.5% of cohort). Normalization formula: z = (x - μ) / σ. Enables cross-feature comparison and goal-setting based on population benchmarks.
+
+Enter your information in the form on the left, and the tool will generate a personalized risk score along with detailed visualizations showing how different factors contribute to your overall risk. The what-if simulator allows you to explore how changing specific values might affect your risk profile, helping you understand which lifestyle modifications could have the greatest impact.
+
+<div style="text-align: center; margin: 40px 0;">
+  <a href="https://qpwgv0-kshamaa-suresh.shinyapps.io/risk_prediction/" target="_blank" style="display: inline-block; padding: 15px 40px; background-color: #27AE60; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold;">
+    Launch Risk Calculator
+  </a>
+</div>
+
+<iframe src="https://qpwgv0-kshamaa-suresh.shinyapps.io/risk_prediction/" width="100%" height="1200px" style="border: 1px solid #ddd; border-radius: 4px; margin-top: 20px;"></iframe>

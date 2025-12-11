@@ -1,0 +1,237 @@
+---
+title: "Colorectal Cancer: Interpretable Machine Learning Analysis"
+execute:
+  echo: true
+format:
+  html:
+    fig-width: 6
+    fig-height: 4
+    embed-resources: true
+---
+
+# Setup and Data Loading
+
+```{r setup}
+#| warning: false
+#| code-fold: true
+
+# Load required libraries
+library(tidyverse)      # Data manipulation and visualization
+library(ggplot2)        # Advanced plotting
+library(scales)         # Scale functions
+library(viridis)        # Color palettes
+library(pROC)           # ROC curves
+library(randomForest)   # Random forest
+library(caret)
+library(rpart)         
+library(rpart.plot) 
+library(vip)
+
+# Set theme for all plots
+theme_set(theme_minimal(base_size = 12))
+```
+
+```{r load-data}
+#| warning: false
+#| code-fold: true
+# Load the dataset
+df <- read_csv("data/crc_dataset.csv", show_col_types = FALSE)
+
+```
+
+
+# Logistic Regression
+
+```{r standardized-logistic}
+#| warning: false
+#| code-fold: true
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(kableExtra)
+
+# Prepare data with STANDARDIZED predictors
+df_model_std <- df |>
+  mutate(
+    Gender_numeric = ifelse(Gender == "Male", 1, 0),
+    Lifestyle_Active = ifelse(Lifestyle == "Active", 1, 0),
+    Lifestyle_Moderate = ifelse(Lifestyle == "Moderate Exercise", 1, 0),
+    Lifestyle_Smoker = ifelse(Lifestyle == "Smoker", 1, 0),
+    Family_History_numeric = ifelse(Family_History_CRC == "Yes", 1, 0)
+  ) |>
+  mutate(
+    # Standardize continuous variables (mean=0, sd=1)
+    Age_std = scale(Age)[,1],
+    BMI_std = scale(BMI)[,1],
+    Carbs_std = scale(`Carbohydrates (g)`)[,1],
+    Protein_std = scale(`Proteins (g)`)[,1],
+    Fats_std = scale(`Fats (g)`)[,1],
+    VitA_std = scale(`Vitamin A (IU)`)[,1],
+    VitC_std = scale(`Vitamin C (mg)`)[,1],
+    Iron_std = scale(`Iron (mg)`)[,1]
+  )
+
+# Build standardized logistic regression model
+model_logistic_std <- glm(CRC_Risk ~ Age_std + BMI_std + Gender_numeric + 
+                           Lifestyle_Active + Lifestyle_Moderate + Lifestyle_Smoker +
+                           Family_History_numeric +
+                           Carbs_std + Protein_std + Fats_std +
+                           VitA_std + VitC_std + Iron_std,
+                          data = df_model_std,
+                          family = binomial(link = "logit"))
+
+# Extract coefficients
+coef_std_df <- tidy(model_logistic_std, conf.int = TRUE) |>
+  arrange(desc(abs(estimate))) |>
+  mutate(
+    Significant = ifelse(p.value < 0.05, "Yes", "No"),
+    OR = exp(estimate),
+    OR_lower = exp(conf.low),
+    OR_upper = exp(conf.high)
+  )
+
+kable(coef_std_df |> select(term, estimate, OR, OR_lower, OR_upper, p.value, Significant), 
+      digits = 4,
+      caption = "Standardized Logistic Regression Coefficients") |>
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r fig.width=10, fig.height=8}
+#| warning: false
+#| code-fold: true
+#| label: fig-std-coef-plot
+#| fig-cap: "Standardized Logistic Regression Coefficients (Comparable Scale)"
+
+coef_std_df |>
+  filter(term != "(Intercept)") |>
+  mutate(term = fct_reorder(term, estimate)) |>
+  ggplot(aes(x = estimate, y = term, color = Significant)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_point(size = 4) +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.3, linewidth = 1) +
+  scale_color_manual(values = c("No" = "gray60", "Yes" = "#e74c3c")) +
+  labs(title = "Standardized Logistic Regression Coefficients with 95% CI",
+       x = "Standardized Coefficient (log odds per SD increase)", 
+       y = "Variable",
+       color = "Significant\n(p < 0.05)") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 14),
+        plot.subtitle = element_text(color = "darkgreen", face = "italic"),
+        legend.position = "right",
+        axis.text.y = element_text(size = 10))
+```
+The standardized coefficient plot highlights the strongest predictors of CRC Risk after placing all variables on a comparable scale. Lifestyle_Smoker emerges as the strongest positive predictor, with smoking substantially increasing the odds of being at CRC risk. Family_History_numeric also shows a strong and significant positive effect, indicating that individuals with a family history of colorectal cancer are meaningfully more likely to be classified as at risk. BMI_std and Age_std both have significant positive contributions as well, showing that higher BMI and older age modestly but consistently elevate risk.
+
+In contrast, dietary variables such as Carbs_std, Protein_std, Fats_std, VitA_std, VitC_std, and Iron_std exhibit coefficients close to zero with wide confidence intervals, suggesting no meaningful linear association with CRC Risk in the logistic framework. Lifestyle_Active and Lifestyle_Moderate appear protective but are not statistically significant. Overall, lifestyle and family history dominate the effect size profile, while nutrient intake plays a minimal role in the logistic model.
+
+```{r}
+#| warning: false
+#| code-fold: true
+df_ml <- df |>
+  mutate(across(where(is.character), as.factor)) |>        
+  mutate(across(where(is.factor), ~ as.numeric(as.factor(.)))) |>  
+  select(-Participant_ID)
+
+set.seed(123)
+split <- createDataPartition(df_ml$CRC_Risk, p = 0.8, list = FALSE)
+train <- df_ml[split, ]
+test <- df_ml[-split, ]
+```
+
+# Decision Tree
+
+```{r}
+#| warning: false
+#| code-fold: true
+tree_model <- rpart(CRC_Risk ~ ., data = train, method = "class")
+rpart.plot(tree_model, extra = 104, under = TRUE, faclen = 0)
+```
+The decision tree provides a rule-based view of the risk classification and reveals the hierarchical structure the model learns. The very first split occurs on Lifestyle, showing it is the most discriminative variable. Individuals with a less healthy lifestyle branch (≥ 4) tend to be directed toward at-risk classifications further down the tree.
+
+For those on the healthier lifestyle path, BMI < 30 becomes the next major decision point, highlighting BMI as an important threshold predictor. Additional splits on Family_History_CRC and Age reflect their importance — younger individuals and those without a family history are more often classified into the no-risk category.
+
+On the other side of the tree, splits on Ethnicity, Vitamin A intake, and Fats intake appear, but they contribute much less to prediction accuracy. Pre-existing Conditions also appears, but only as a shallow split, meaning its predictive power is limited. Overall, the structure mirrors the logistic regression results: lifestyle, BMI, family history, and age drive nearly all classification decisions.
+
+```{r}
+#| warning: false
+#| code-fold: true
+vip(tree_model, num_features = 10)
+```
+The variable importance plot reinforces the hierarchy observed in the tree. Age is the most important single predictor, followed closely by Lifestyle and Family_History_CRC. BMI also ranks highly, confirming its role as a key threshold-based predictor. Vitamin A and Iron show moderate importance, which reflects their occasional appearance in the tree splits but not with strong predictive power.
+
+Pre-existing Conditions, Ethnicity, and macronutrient variables such as Fats and Proteins appear much lower on the scale, indicating limited contribution to the tree’s predictive performance. The ranking makes it clear that demographic and behavioral factors far outweigh nutritional factors in their influence on CRC classification.
+
+```{r tree_pdp, message=FALSE, warning=FALSE, fig.width=10, fig.height=8}
+#| warning: false
+#| code-fold: true
+library(pdp)
+library(dplyr)
+library(ggplot2)
+
+# Numeric predictors for PDP (exclude outcome)
+num_vars <- setdiff(
+  names(train)[sapply(train, is.numeric)],
+  "CRC_Risk"
+)
+
+# Compute partial dependence for each numeric predictor using the decision tree
+pd_tree <- bind_rows(lapply(num_vars, function(v) {
+  p <- partial(
+    tree_model,
+    pred.var    = v,
+    train       = train,
+    prob        = TRUE,
+    which.class = "1"   # assumes class "1" = at-risk; change if needed
+  )
+  tibble(
+    x        = p[[v]],
+    yhat     = p$yhat,
+    variable = v
+  )
+}))
+
+# Order variables by variability in their PDP curves
+sd_tree <- sort(tapply(pd_tree$yhat, pd_tree$variable, sd), decreasing = TRUE)
+pd_tree$variable <- factor(pd_tree$variable, levels = names(sd_tree))
+
+# Plot PDPs
+ggplot(pd_tree, aes(x = x, y = yhat)) +
+  geom_line() +
+  facet_wrap(~ variable, scales = "free_x") +
+  labs(
+    x     = "Predictor value",
+    y     = "Predicted P(CRC_Risk = 1)",
+    title = "Partial Dependence Plots (Decision Tree)"
+  ) +
+  theme_bw()
+```
+
+**Lifestyle**: Risk probability increases sharply at higher lifestyle codes, confirming that smoking or sedentary lifestyles considerably elevate CRC risk.
+
+**BMI**: There is a steep jump in predicted CRC risk once BMI exceeds ~30, indicating a learned threshold effect consistent with clinical understanding of obesity as a risk factor.
+
+**Family_History_CRC**:Risk steadily increases with higher family history values, showing a nearly linear relationship and reinforcing its strong model importance.
+
+**Age**: Risk increases around age 55 and then plateaus, capturing a midlife threshold beyond which the model associates age with increased likelihood of CRC risk.
+
+**Ethnicity**: A small upward trend appears across ethnic categories, but the overall probability change is modest; ethnicity is not a strong standalone predictor.
+
+**Vitamin A (IU)**: Risk forms a shallow hump around mid-range Vitamin A values but varies only slightly, showing weak influence.
+
+**Pre-existing Conditions**:Risk decreases very slightly as pre-existing condition count rises, but overall variation is minimal; the model does not rely heavily on this feature.
+
+**Proteins (g)**: A minor dip appears around higher protein intake levels, but risk probabilities remain nearly flat, suggesting negligible effect.
+
+**Fats (g)**: Risk shows a tiny increase when fats exceed ~50 g but stays nearly constant afterward — again confirming very low predictive contribution.
+
+**Carbohydrates (g)**: Carbs have no meaningful effect on predicted CRC risk in the tree model.
+
+**Gender**: Prediction remains flat across genders, indicating no tree-based discrimination.
+
+**Iron (mg)**: Slight monotonic rise, but overall risk probabilities remain low iron is not an important determinant.
+
+**Vitamin C (mg)**: Vitamin C has no zero predictive influence.
+
+# Conclusion
+
+Across all interpretability methods — logistic regression, decision tree structure, variable importance, and partial dependence — the findings are consistent and robust. Behavioral and demographic variables, particularly Lifestyle, Age, BMI, and Family History of CRC, emerge as the dominant predictors of colorectal cancer risk. Logistic regression identifies strong positive effects for smoking, higher BMI, older age, and family history, while nutritional intake variables contribute minimally. The decision tree further emphasizes the primacy of lifestyle and BMI through its top-level splits, and the variable importance plot quantifies the dominance of demographic factors over dietary ones. Partial dependence plots show clear threshold effects for BMI and age, while diet-related predictors show almost no meaningful change in risk across intake levels. Collectively, this analysis suggests that in this dataset, CRC risk is driven far more by lifestyle and personal/family medical history than by macronutrient or micronutrient consumption patterns.
